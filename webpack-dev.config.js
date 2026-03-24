@@ -19,8 +19,7 @@ const config = {
   plugins: [
     new HtmlWebpackPlugin({
       template: './public/index.html',
-      inject: 'head',
-      scriptLoading: 'blocking'
+      inject: false
     }),
     new CopyWebpackPlugin({
       patterns: [
