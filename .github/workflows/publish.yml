@@ -1,0 +1,86 @@
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version bump (patch, minor, major, or exact e.g. 1.2.3)'
+        required: true
+        default: 'patch'
+      dry_run:
+        description: 'Dry run (skip publish)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Git config
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Bump version
+        id: bump
+        run: |
+          NEW_VERSION=$(npm version ${{ inputs.version }} --no-git-tag-version)
+          NEW_VERSION="${NEW_VERSION#v}"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumped to $NEW_VERSION"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit, tag and push
+        if: inputs.dry_run != true
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          git add -A
+          git commit -m "release: v${VERSION}"
+          git tag "siteview-sdk-v${VERSION}"
+          git push origin HEAD --follow-tags
+
+      - name: Publish to npm
+        if: inputs.dry_run != true
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: inputs.dry_run != true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: siteview-sdk-v${{ steps.bump.outputs.version }}
+          name: v${{ steps.bump.outputs.version }}
+          generate_release_notes: true
+
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "=========================================="
+          echo "DRY-RUN COMPLETE"
+          echo "=========================================="
+          echo "Version would be: ${{ steps.bump.outputs.version }}"
+          echo "Changes NOT committed, tagged, or published."

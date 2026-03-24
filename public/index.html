@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CupixWorks SiteView SDK - Playground</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ── Header ── */
+      #header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        background: #1e293b;
+        border-bottom: 1px solid #334155;
+        flex-shrink: 0;
+      }
+      #header h1 {
+        font-size: 14px;
+        font-weight: 600;
+        color: #f1f5f9;
+      }
+      #header h1 span {
+        color: #38bdf8;
+      }
+      #header-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+      }
+      #header-controls label {
+        color: #94a3b8;
+      }
+      #header-controls input {
+        background: #0f172a;
+        border: 1px solid #475569;
+        border-radius: 4px;
+        color: #e2e8f0;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-family: 'SF Mono', monospace;
+      }
+      #header-controls input:focus {
+        outline: 1px solid #38bdf8;
+      }
+      #header-controls input.url-input {
+        width: 360px;
+      }
+      #header-controls input.token-input {
+        width: 180px;
+      }
+      #btn-connect {
+        padding: 4px 12px;
+        background: #38bdf8;
+        color: #0f172a;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #btn-connect:hover {
+        background: #7dd3fc;
+      }
+
+      /* ── Main layout: Content + Sidebar ── */
+      #main {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* ── Content (viewer + output) ── */
+      #content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      /* ── Viewer ── */
+      #cupix-container {
+        flex: 1;
+        background: #1e293b;
+        position: relative;
+      }
+      #cupix-container .placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #475569;
+        font-size: 13px;
+        pointer-events: none;
+      }
+
+      /* ── Sidebar / Commands (right) ── */
+      #sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        background: #1e293b;
+        border-left: 1px solid #334155;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+      }
+      .section {
+        padding: 10px 12px 6px;
+        border-bottom: 1px solid #1a2436;
+      }
+      .section-title {
+        font-size: 10px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 6px;
+      }
+      .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding-bottom: 4px;
+      }
+      button {
+        padding: 4px 8px;
+        border: 1px solid #334155;
+        border-radius: 3px;
+        background: #0f172a;
+        color: #cbd5e1;
+        cursor: pointer;
+        font-size: 11px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        transition: all 0.1s;
+      }
+      button:hover {
+        background: #38bdf8;
+        color: #0f172a;
+        border-color: #38bdf8;
+      }
+      .btn-option {
+        background: #1e293b;
+        border-color: #475569;
+        color: #94a3b8;
+        font-size: 10px;
+      }
+      .btn-option:hover {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: #fff;
+      }
+      .sub-label {
+        font-size: 10px;
+        color: #475569;
+        margin: 4px 0 2px;
+      }
+
+      /* ── Output (bottom) ── */
+      #output {
+        flex-shrink: 0;
+        height: 25vh;
+        min-height: 80px;
+        border-top: 1px solid #334155;
+        display: flex;
+        background: #0f172a;
+        position: relative;
+      }
+      #output-resizer {
+        position: absolute;
+        top: -3px;
+        left: 0;
+        right: 0;
+        height: 6px;
+        cursor: ns-resize;
+        z-index: 10;
+      }
+      #output-resizer:hover {
+        background: #38bdf8;
+        opacity: 0.5;
+      }
+      .output-box {
+        flex: 1;
+        padding: 8px 12px;
+        overflow-y: auto;
+        font-size: 11px;
+      }
+      .output-box + .output-box {
+        border-left: 1px solid #334155;
+      }
+      .output-box h3 {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 4px;
+      }
+      .output-box h3.blue {
+        color: #38bdf8;
+      }
+      .output-box h3.green {
+        color: #4ade80;
+      }
+      .output-box h3.amber {
+        color: #fbbf24;
+      }
+      .output-box h3.purple {
+        color: #a78bfa;
+      }
+      .output-box .timestamp {
+        font-size: 10px;
+        color: #475569;
+      }
+      .output-box .type {
+        font-size: 12px;
+        font-weight: 600;
+        color: #f1f5f9;
+        margin: 2px 0;
+      }
+      .output-box pre {
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #94a3b8;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        line-height: 1.4;
+      }
+      .error-msg {
+        color: #f87171;
+      }
+
+      /* ── Scrollbar ── */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <div id="header">
+      <h1><span>SiteView</span> SDK Playground</h1>
+      <div id="header-controls">
+        <label>URL</label>
+        <input id="input-url" class="url-input" type="text" value="https://apidemo.cupix.works/hsv/9hivpe82w8" />
+        <label>Token</label>
+        <input id="input-token" class="token-input" type="text" placeholder="API token (optional)" />
+        <button id="btn-connect" onclick="connectViewer()">Connect</button>
+      </div>
+    </div>
+
+    <div id="main">
+      <!-- Content: Viewer + Output -->
+      <div id="content">
+        <!-- Viewer -->
+        <div id="cupix-container">
+          <div class="placeholder" id="placeholder-text">Click "Connect" to load the viewer</div>
+        </div>
+
+        <!-- Output (bottom, inside content) -->
+        <div id="output">
+          <div id="output-resizer"></div>
+          <div class="output-box">
+            <h3 class="green">Request (Sent)</h3>
+            <div class="timestamp" id="req-timestamp"></div>
+            <div class="type" id="req-type">--</div>
+            <pre id="req-content"></pre>
+          </div>
+          <div class="output-box">
+            <h3 class="amber">Response</h3>
+            <div class="timestamp" id="resp-timestamp"></div>
+            <div class="type" id="resp-type">--</div>
+            <pre id="resp-content"></pre>
+            <div class="error-msg" id="resp-error-msg"></div>
+            <pre class="error-msg" id="resp-error-args"></pre>
+          </div>
+          <div class="output-box">
+            <h3 class="blue">Broadcast Events</h3>
+            <div class="timestamp" id="event-timestamp"></div>
+            <div class="type" id="event-type">--</div>
+            <pre id="event-content"></pre>
+          </div>
+          <div class="output-box">
+            <h3 class="purple">Camera Events</h3>
+            <div class="timestamp" id="camera-timestamp"></div>
+            <div class="type" id="camera-type">--</div>
+            <pre id="camera-content"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Commands (right) -->
+      <div id="sidebar">
+        <div class="section">
+          <div class="section-title">Document</div>
+          <div class="btn-group">
+            <button onclick="Playground.getDocument()">getDocument</button>
+            <button onclick="Playground.getSiteview()">getSiteview</button>
+            <button onclick="Playground.getActiveLevel()">getActiveLevel</button>
+            <button onclick="Playground.getActiveCapture()">getActiveCapture</button>
+            <button onclick="Playground.isDocumentLoaded()">isDocumentLoaded</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Viewer Mode</div>
+          <div class="btn-group">
+            <button onclick="Playground.changeViewerMode('pano')">pano</button>
+            <button onclick="Playground.changeViewerMode('bim')">bim</button>
+          </div>
+          <div class="sub-label">Pano View Mode</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.changePanoViewMode('walk')">walk</button>
+            <button class="btn-option" onclick="Playground.changePanoViewMode('fly')">fly</button>
+            <button class="btn-option" onclick="Playground.changePanoViewMode('overhead')">overhead</button>
+          </div>
+          <div class="sub-label">Active View</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.changeActiveView('pano')">pano</button>
+            <button class="btn-option" onclick="Playground.changeActiveView('bim')">bim</button>
+          </div>
+          <div class="sub-label">Pano Visibility Mode</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.changePanoVisibilityMode('ALL')">ALL</button>
+            <button class="btn-option" onclick="Playground.changePanoVisibilityMode('PANO')">PANO</button>
+            <button class="btn-option" onclick="Playground.changePanoVisibilityMode('3D')">3D</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Camera</div>
+          <div class="btn-group">
+            <button onclick="Playground.getCameraParameters()">getCameraParameters</button>
+            <button onclick="Playground.setCameraParametersPrompt()">setCameraParameters...</button>
+            <button onclick="Playground.resetView()">resetView</button>
+          </div>
+          <div class="sub-label">Rotate</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setCameraRotate('LEFT', 15)">left</button>
+            <button class="btn-option" onclick="Playground.setCameraRotate('RIGHT', 15)">right</button>
+            <button class="btn-option" onclick="Playground.setCameraRotate('UP', 15)">up</button>
+            <button class="btn-option" onclick="Playground.setCameraRotate('DOWN', 15)">down</button>
+          </div>
+          <div class="sub-label">Look At</div>
+          <div class="btn-group">
+            <button onclick="Playground.setCameraLookAtPrompt()">setCameraLookAt...</button>
+          </div>
+          <div class="sub-label">Move</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setCameraMove('FORWARD')">forward</button>
+            <button class="btn-option" onclick="Playground.setCameraMove('BACK')">back</button>
+            <button class="btn-option" onclick="Playground.setCameraMove('LEFT')">left</button>
+            <button class="btn-option" onclick="Playground.setCameraMove('RIGHT')">right</button>
+          </div>
+          <div class="sub-label">FOV (degrees)</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setCameraFov(30)">30</button>
+            <button class="btn-option" onclick="Playground.setCameraFov(60)">60</button>
+            <button class="btn-option" onclick="Playground.setCameraFov(90)">90</button>
+            <button class="btn-option" onclick="Playground.setCameraFov(120)">120</button>
+          </div>
+          <div class="sub-label">First Person (BIM)</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setCameraFirstPerson(true)">enable</button>
+            <button class="btn-option" onclick="Playground.setCameraFirstPerson(false)">disable</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Navigation</div>
+          <div class="btn-group">
+            <button onclick="Playground.changeLevelCapturePrompt()">changeLevelCapture...</button>
+            <button onclick="Playground.changePanoPrompt()">changePano...</button>
+            <button onclick="Playground.changeBimPrompt()">changeBim...</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Annotation</div>
+          <div class="btn-group">
+            <button onclick="Playground.setActiveAnnotationPrompt()">setActiveAnnotation...</button>
+            <button onclick="Playground.resetActiveAnnotation()">resetActiveAnnotation</button>
+            <button onclick="Playground.loadAnnotationPrompt()">loadAnnotation...</button>
+            <button onclick="Playground.addAnnotationFormPrompt()">addAnnotationForm...</button>
+          </div>
+          <div class="sub-label">Load</div>
+          <div class="btn-group">
+            <button onclick="Playground.loadAnnotationGroupPrompt()">loadAnnotationGroup...</button>
+          </div>
+          <div class="sub-label">Filter</div>
+          <div class="btn-group">
+            <button onclick="Playground.setFilterPrompt()">setFilter...</button>
+          </div>
+          <div class="sub-label">Annotation Group Visibility</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(true)">showAll</button>
+            <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(false)">hideAll</button>
+            <button onclick="Playground.setAnnotationGroupVisibilityPrompt()">setAnnotationGroupVisibility...</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Omninote</div>
+          <div class="btn-group">
+            <button onclick="Playground.loadOmninotesPrompt()">loadOmninotes...</button>
+            <button onclick="Playground.unloadOmninotesPrompt()">unloadOmninotes...</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Refplan</div>
+          <div class="btn-group">
+            <button onclick="Playground.enableRefplan()">enableRefplan</button>
+            <button onclick="Playground.getRefplansOfLevelPrompt()">getRefplansOfLevel...</button>
+            <button onclick="Playground.setActiveRefplanPrompt()">setActiveRefplan...</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Display</div>
+          <div class="sub-label">Opacity</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setOpacity(0.0)">0%</button>
+            <button class="btn-option" onclick="Playground.setOpacity(0.25)">25%</button>
+            <button class="btn-option" onclick="Playground.setOpacity(0.5)">50%</button>
+            <button class="btn-option" onclick="Playground.setOpacity(0.75)">75%</button>
+            <button class="btn-option" onclick="Playground.setOpacity(1.0)">100%</button>
+          </div>
+          <div class="sub-label">BIM Background</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setBimBackgroundTransparent(true)">transparent</button>
+            <button class="btn-option" onclick="Playground.setBimBackgroundTransparent(false)">opaque</button>
+          </div>
+          <div class="sub-label">Float Map</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setFloatMapVisible(true)">show</button>
+            <button class="btn-option" onclick="Playground.setFloatMapVisible(false)">hide</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="playground.js"></script>
+    <script>
+      (function () {
+        var resizer = document.getElementById('output-resizer');
+        var output = document.getElementById('output');
+        var startY, startH, activeIframe;
+        resizer.addEventListener('mousedown', function (e) {
+          startY = e.clientY;
+          startH = output.offsetHeight;
+          activeIframe = document.querySelector('#cupix-container iframe');
+          if (activeIframe) activeIframe.style.pointerEvents = 'none';
+          document.body.style.userSelect = 'none';
+          document.addEventListener('mousemove', onDrag);
+          document.addEventListener('mouseup', onStop);
+          e.preventDefault();
+        });
+        function onDrag(e) {
+          var newH = startH - (e.clientY - startY);
+          if (newH < 80) newH = 80;
+          output.style.height = newH + 'px';
+        }
+        function onStop() {
+          document.removeEventListener('mousemove', onDrag);
+          document.removeEventListener('mouseup', onStop);
+          document.body.style.userSelect = '';
+          if (activeIframe) activeIframe.style.pointerEvents = '';
+          activeIframe = null;
+        }
+      })();
+    </script>
+  </body>
+</html>
