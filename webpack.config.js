@@ -37,7 +37,7 @@ const config = {
   ...defaultConfig,
   entry: {
     'umd/siteview-sdk': path.resolve(__dirname, 'src/siteview-sdk.js'),
-    'umd/SiteViewSDK.min': path.resolve(__dirname, 'src/siteview-sdk.js')
+    'umd/siteview-sdk.min': path.resolve(__dirname, 'src/siteview-sdk.js')
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
