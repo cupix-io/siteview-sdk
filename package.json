@@ -1,7 +1,7 @@
 {
   "name": "@cupix-sdk/siteview-sdk",
   "description": "CupixWorks SiteView SDK for embedding",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "scripts": {
     "build": "webpack --mode=production --node-env=production",
     "build:dev": "webpack --mode=development",
