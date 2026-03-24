@@ -60,6 +60,7 @@ jobs:
           git add -A
           git commit -m "release: v${VERSION}"
           git tag "siteview-sdk-v${VERSION}"
+          git pull --rebase origin main
           git push origin HEAD --follow-tags
 
       - name: Publish to npm
