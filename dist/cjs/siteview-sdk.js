@@ -259,6 +259,8 @@ SiteViewSDK.start = function (timeout) {
     operationType: OPERATION_TYPE.HEADLESS_VIEWER_API_START
   }, timeout);
 };
+
+/** Stops the headless viewer API. */
 SiteViewSDK.stop = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.HEADLESS_VIEWER_API_STOP
@@ -267,26 +269,35 @@ SiteViewSDK.stop = function () {
 
 // ── Document ──
 
+/** Returns the current document information. */
 SiteViewSDK.getDocument = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.GET_DOCUMENT
   });
 };
+
+/** Returns the current siteview information. */
 SiteViewSDK.getSiteview = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.GET_SITEVIEW
   });
 };
+
+/** Checks whether the document has been fully loaded. */
 SiteViewSDK.isDocumentLoaded = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.IS_DOCUMENT_LOADED
   });
 };
+
+/** Returns the currently active level. */
 SiteViewSDK.getActiveLevel = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.GET_ACTIVE_LEVEL
   });
 };
+
+/** Returns the currently active capture. */
 SiteViewSDK.getActiveCapture = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.GET_ACTIVE_CAPTURE
@@ -337,6 +348,7 @@ SiteViewSDK.changePanoVisibilityMode = function (visibilityMode) {
 
 // ── Camera ──
 
+/** Returns the current camera parameters (position, rotation, fov, etc.). */
 SiteViewSDK.getCameraParameters = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.GET_CAMERA_PARAMETERS
@@ -405,6 +417,8 @@ SiteViewSDK.setCameraFov = function (fov) {
     }
   });
 };
+
+/** Resets the camera view to its default position. */
 SiteViewSDK.resetView = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.RESET_VIEW
@@ -448,6 +462,13 @@ SiteViewSDK.changeBim = function (bims) {
 
 // ── Annotation ──
 
+/**
+ * Adds a new annotation form.
+ * @param {number} formTemplateId - Form template ID
+ * @param {number} annotationGroupId - Annotation group ID
+ * @param {string} name - Annotation name
+ * @param {Object} values - Form field values
+ */
 SiteViewSDK.addAnnotationForm = function (formTemplateId, annotationGroupId, name, values) {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.ADD_ANNOTATION_FORM,
@@ -469,6 +490,8 @@ SiteViewSDK.setActiveAnnotation = function (annotationId) {
     }
   });
 };
+
+/** Clears the currently active annotation selection. */
 SiteViewSDK.resetActiveAnnotation = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.RESET_ACTIVE_ANNOTATION
@@ -570,6 +593,7 @@ SiteViewSDK.unloadOmninotes = function (omninoteKeys) {
 
 // ── Refplan ──
 
+/** Enables the reference plan (floor plan overlay) feature. */
 SiteViewSDK.enableRefplan = function () {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.ENABLE_REFPLAN

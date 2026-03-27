@@ -2,6 +2,7 @@
 
 const path = require('path');
 const TerserJSPlugin = require('terser-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const isProduction = process.env.NODE_ENV == 'production';
 
@@ -44,7 +45,11 @@ const config = {
     libraryTarget: 'umd',
     clean: true
   },
-  plugins: []
+  plugins: [
+    new CopyWebpackPlugin({
+      patterns: [{ from: 'src/siteview-sdk.d.ts', to: 'siteview-sdk.d.ts' }]
+    })
+  ]
 };
 
 const cjsConfig = {

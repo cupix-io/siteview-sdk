@@ -14,7 +14,14 @@
     "registry": "https://registry.npmjs.org/"
   },
   "main": "./dist/umd/siteview-sdk.min.js",
+  "module": "./dist/esm/siteview-sdk.min.js",
+  "types": "./dist/siteview-sdk.d.ts",
   "license": "MIT",
+  "author": "Cupix, Inc.",
+  "homepage": "https://github.com/cupix-io/siteview-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/cupix-io/siteview-sdk/issues"
+  },
   "files": [
     "dist",
     "!**/node_modules"
