@@ -2,27 +2,36 @@
 
 (function () {
   var urlInput = document.getElementById('input-url');
+  var authTypeInput = document.getElementById('input-auth-type');
   var tokenInput = document.getElementById('input-token');
   var savedUrl = localStorage.getItem('playground_url');
+  var savedAuthType = localStorage.getItem('playground_auth_type');
   var savedToken = localStorage.getItem('playground_token');
   if (savedUrl) urlInput.value = savedUrl;
+  if (savedAuthType) authTypeInput.value = savedAuthType;
   if (savedToken) tokenInput.value = savedToken;
 })();
 
 // eslint-disable-next-line no-unused-vars -- called from HTML onclick
 function connectViewer() {
   const url = document.getElementById('input-url').value;
+  const authType = document.getElementById('input-auth-type').value;
   const token = document.getElementById('input-token').value;
   if (!url) return;
 
   localStorage.setItem('playground_url', url);
+  localStorage.setItem('playground_auth_type', authType);
   localStorage.setItem('playground_token', token);
 
   const placeholder = document.getElementById('placeholder-text');
   if (placeholder) placeholder.style.display = 'none';
 
   const auth = {};
-  if (token) auth.apiToken = token;
+  if (token && authType === 'accessCode') {
+    auth.accessCode = token;
+  } else if (token) {
+    auth.apiToken = token;
+  }
 
   SiteViewSDK.init('cupix-container', url, auth);
 }
@@ -309,6 +318,19 @@ Playground.changePanoVisibilityMode = function (visibilityMode) {
   });
 };
 
+Playground.setPanoRenderingMode = function (renderingMode, width) {
+  var args = { renderingMode: renderingMode };
+  if (width !== undefined) args.width = width;
+  callSDK('SET_PANO_RENDERING_MODE', args, function () {
+    SiteViewSDK.setPanoRenderingMode(renderingMode, width);
+  });
+};
+
+Playground.setPanoRenderingModeCubemapPrompt = async function () {
+  const width = await Playground.promptNumber('SET_PANO_RENDERING_MODE', 'cubemap width');
+  Playground.setPanoRenderingMode('CUBEMAP', width);
+};
+
 // ── Camera ──
 
 Playground.getCameraParameters = function () {
@@ -340,7 +362,7 @@ Playground.setCameraLookAtPrompt = async function () {
   sessionStorage.setItem('lookAt_x', result.x);
   sessionStorage.setItem('lookAt_y', result.y);
   sessionStorage.setItem('lookAt_z', result.z);
-  callSDK('SET_CAMERA_LOOKAT', { x, y, z }, function () {
+  callSDK('SET_CAMERA_LOOKAT', { lookAtX: x, lookAtY: y, lookAtZ: z }, function () {
     SiteViewSDK.setCameraLookAt(x, y, z);
   });
 };
@@ -552,6 +574,64 @@ Playground.loadAnnotationGroupPrompt = async function () {
   }
 };
 
+Playground.setAnnotationUserColorPrompt = async function () {
+  const result = await showPromptMultiple([
+    { name: 'annotationId', label: 'Annotation ID', defaultValue: sessionStorage.getItem('userColorAnnotationId') || '' },
+    { name: 'foregroundColor', label: 'Foreground (hex e.g. #ffffff, empty = reset)', defaultValue: sessionStorage.getItem('userFgColor') || '' },
+    { name: 'backgroundColor', label: 'Background (hex e.g. #ff5722, empty = reset)', defaultValue: sessionStorage.getItem('userBgColor') || '' }
+  ]);
+  if (!result) return;
+  const annotationId = Number(result.annotationId);
+  if (isNaN(annotationId)) {
+    setOutputErrorMessage('SET_ANNOTATION_USER_COLOR', 'invalid annotation id', result);
+    return;
+  }
+  sessionStorage.setItem('userColorAnnotationId', result.annotationId);
+  sessionStorage.setItem('userFgColor', result.foregroundColor);
+  sessionStorage.setItem('userBgColor', result.backgroundColor);
+  var colors = {};
+  var fg = result.foregroundColor.trim();
+  var bg = result.backgroundColor.trim();
+  if (fg !== '') colors.foregroundColor = fg;
+  else colors.foregroundColor = null;
+  if (bg !== '') colors.backgroundColor = bg;
+  else colors.backgroundColor = null;
+  var args = { annotationId: annotationId, foregroundColor: colors.foregroundColor, backgroundColor: colors.backgroundColor };
+  callSDK('SET_ANNOTATION_USER_COLOR', args, function () {
+    SiteViewSDK.setAnnotationUserColor(annotationId, colors);
+  });
+};
+
+Playground.startAnnotationRelocationPrompt = async function () {
+  const str = await showPrompt('Annotation ID (empty = active annotation)', sessionStorage.getItem('relocationAnnotationId') || '');
+  if (str == null) return;
+  const args = {};
+  if (str.trim() !== '') {
+    const id = Number(str.trim());
+    if (isNaN(id)) {
+      setOutputErrorMessage('START_ANNOTATION_RELOCATION', 'invalid annotation id', { input: str });
+      return;
+    }
+    sessionStorage.setItem('relocationAnnotationId', str.trim());
+    args.annotationId = id;
+  }
+  callSDK('START_ANNOTATION_RELOCATION', args, function () {
+    SiteViewSDK.startAnnotationRelocation(args.annotationId);
+  });
+};
+
+Playground.completeAnnotationRelocation = function () {
+  callSDK('COMPLETE_ANNOTATION_RELOCATION', {}, function () {
+    SiteViewSDK.completeAnnotationRelocation();
+  });
+};
+
+Playground.cancelAnnotationRelocation = function () {
+  callSDK('CANCEL_ANNOTATION_RELOCATION', {}, function () {
+    SiteViewSDK.cancelAnnotationRelocation();
+  });
+};
+
 // ── Omninote ──
 
 Playground.loadOmninotesPrompt = async function () {
@@ -572,6 +652,70 @@ Playground.loadOmninotesPrompt = async function () {
   } catch (e) {
     if (e.message !== 'cancelled') console.warn(e);
   }
+};
+
+Playground.lookAtOmninotePrompt = async function () {
+  try {
+    const key = await Playground.promptString('LOOK_AT_OMNINOTE', 'omninote key');
+    if (!key || key.trim().length === 0) {
+      setOutputErrorMessage('LOOK_AT_OMNINOTE', 'empty key', { input: key });
+      return;
+    }
+    const omninoteKey = key.trim();
+    callSDK('LOOK_AT_OMNINOTE', { omninoteKey: omninoteKey }, function () {
+      SiteViewSDK.lookAtOmninote(omninoteKey);
+    });
+  } catch (e) {
+    if (e.message !== 'cancelled') console.warn(e);
+  }
+};
+
+Playground.setActiveOmninotePrompt = async function () {
+  try {
+    const key = await Playground.promptString('SET_ACTIVE_OMNINOTE', 'omninote key');
+    if (!key || key.trim().length === 0) {
+      setOutputErrorMessage('SET_ACTIVE_OMNINOTE', 'empty key', { input: key });
+      return;
+    }
+    const omninoteKey = key.trim();
+    callSDK('SET_ACTIVE_OMNINOTE', { omninoteKey: omninoteKey }, function () {
+      SiteViewSDK.setActiveOmninote(omninoteKey);
+    });
+  } catch (e) {
+    if (e.message !== 'cancelled') console.warn(e);
+  }
+};
+
+Playground.resetActiveOmninote = function () {
+  callSDK('RESET_ACTIVE_OMNINOTE', {}, function () {
+    SiteViewSDK.resetActiveOmninote();
+  });
+};
+
+Playground.setOmninoteTagVisibilityPrompt = async function () {
+  try {
+    const str = await Playground.promptString('SET_OMNINOTE_TAG_VISIBILITY', 'omninote tag ids (comma-separated)');
+    const ids = str.split(',').map(function (s) {
+      return Number(s.trim());
+    }).filter(function (id) {
+      return !isNaN(id);
+    });
+    if (ids.length === 0) {
+      setOutputErrorMessage('SET_OMNINOTE_TAG_VISIBILITY', 'empty tag ids', { input: str });
+      return;
+    }
+    callSDK('SET_OMNINOTE_TAG_VISIBILITY', { omninoteTagIds: ids, visible: true }, function () {
+      SiteViewSDK.setOmninoteTagVisibility(ids, true);
+    });
+  } catch (e) {
+    if (e.message !== 'cancelled') console.warn(e);
+  }
+};
+
+Playground.setOmninoteTagAllVisibility = function (visible) {
+  callSDK('SET_OMNINOTE_TAG_ALL_VISIBILITY', { visible: visible }, function () {
+    SiteViewSDK.setOmninoteTagAllVisibility(visible);
+  });
 };
 
 Playground.unloadOmninotesPrompt = async function () {

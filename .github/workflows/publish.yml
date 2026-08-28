@@ -57,10 +57,10 @@ jobs:
         if: inputs.dry_run != true
         run: |
           VERSION="${{ steps.bump.outputs.version }}"
+          git pull --rebase origin main
           git add -A
           git commit -m "release: v${VERSION}"
           git tag "siteview-sdk-v${VERSION}"
-          git pull --rebase origin main
           git push origin HEAD --follow-tags
 
       - name: Publish to npm

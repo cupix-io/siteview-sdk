@@ -1,0 +1,44 @@
+{
+  "name": "siteview-sdk",
+  "root": "apps/sdk/siteview-sdk",
+  "sourceRoot": "apps/sdk/siteview-sdk/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx webpack --mode=production --node-env=production",
+        "cwd": "apps/sdk/siteview-sdk"
+      }
+    },
+    "build:dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx webpack --mode=development",
+        "cwd": "apps/sdk/siteview-sdk"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx webpack serve --config ./webpack-dev.config.js",
+        "cwd": "apps/sdk/siteview-sdk"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx vitest run",
+        "cwd": "apps/sdk/siteview-sdk"
+      }
+    },
+    "test:e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx playwright test",
+        "cwd": "apps/sdk/siteview-sdk"
+      }
+    }
+  }
+}

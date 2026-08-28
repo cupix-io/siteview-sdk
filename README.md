@@ -21,6 +21,8 @@ npm run serve
 
 Then open `http://localhost:8081` in your browser.
 
+For private Headless SiteView URLs, provide an auth value before connecting. Choose `API token` to append `cupix_api_token`, or `Access code` to append `access_code`. A 401 during initial load usually means the iframe was opened without a valid auth query and the browser's saved local session could not be refreshed.
+
 # Quick Start
 
 ### Include the SDK library
@@ -71,7 +73,22 @@ SiteViewSDK.changePano(panoId);
 SiteViewSDK.setCameraRotate('LEFT', 15);
 SiteViewSDK.setCameraFov(60);
 
+// Cubemap rendering
+SiteViewSDK.setPanoRenderingMode('CUBEMAP', 6144);
+SiteViewSDK.setPanoRenderingMode('NORMAL');
+
 // Annotation
 SiteViewSDK.setActiveAnnotation(annotationId);
 SiteViewSDK.loadAnnotationGroup([groupId1, groupId2]);
+
+// Annotation User Color (local-only, not persisted)
+SiteViewSDK.setAnnotationUserColor(annotationId, {
+  foregroundColor: '#ffffff',
+  backgroundColor: '#ff5722'
+});
+// Reset colors (null = reset, omit = keep current)
+SiteViewSDK.setAnnotationUserColor(annotationId, {
+  foregroundColor: null,
+  backgroundColor: null
+});
 ```

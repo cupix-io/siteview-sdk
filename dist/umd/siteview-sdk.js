@@ -71,6 +71,7 @@ var OPERATION_TYPE = {
   CHANGE_PANO_VIEW_MODE: 'CHANGE_PANO_VIEW_MODE',
   CHANGE_ACTIVE_VIEW: 'CHANGE_ACTIVE_VIEW',
   CHANGE_PANO_VISIBILITY_MODE: 'CHANGE_PANO_VISIBILITY_MODE',
+  SET_PANO_RENDERING_MODE: 'SET_PANO_RENDERING_MODE',
   // Camera
   GET_CAMERA_PARAMETERS: 'GET_CAMERA_PARAMETERS',
   SET_CAMERA_ROTATE: 'SET_CAMERA_ROTATE',
@@ -95,8 +96,17 @@ var OPERATION_TYPE = {
   LOAD_ANNOTATIONS: 'LOAD_ANNOTATIONS',
   LOAD_ANNOTATION_GROUP: 'LOAD_ANNOTATION_GROUP',
   UNLOAD_ANNOTATIONS: 'UNLOAD_ANNOTATIONS',
+  SET_ANNOTATION_USER_COLOR: 'SET_ANNOTATION_USER_COLOR',
+  START_ANNOTATION_RELOCATION: 'START_ANNOTATION_RELOCATION',
+  COMPLETE_ANNOTATION_RELOCATION: 'COMPLETE_ANNOTATION_RELOCATION',
+  CANCEL_ANNOTATION_RELOCATION: 'CANCEL_ANNOTATION_RELOCATION',
   // Omninote
   LOAD_OMNINOTES: 'LOAD_OMNINOTES',
+  LOOK_AT_OMNINOTE: 'LOOK_AT_OMNINOTE',
+  SET_ACTIVE_OMNINOTE: 'SET_ACTIVE_OMNINOTE',
+  RESET_ACTIVE_OMNINOTE: 'RESET_ACTIVE_OMNINOTE',
+  SET_OMNINOTE_TAG_VISIBILITY: 'SET_OMNINOTE_TAG_VISIBILITY',
+  SET_OMNINOTE_TAG_ALL_VISIBILITY: 'SET_OMNINOTE_TAG_ALL_VISIBILITY',
   UNLOAD_OMNINOTES: 'UNLOAD_OMNINOTES',
   // Refplan
   ENABLE_REFPLAN: 'ENABLE_REFPLAN',
@@ -346,6 +356,21 @@ SiteViewSDK.changePanoVisibilityMode = function (visibilityMode) {
   });
 };
 
+/**
+ * @param {'NORMAL' | 'CUBEMAP'} renderingMode
+ * @param {number} [width] - Cubemap output width. Height is derived automatically.
+ */
+SiteViewSDK.setPanoRenderingMode = function (renderingMode, width) {
+  var args = {
+    renderingMode: renderingMode
+  };
+  if (width !== undefined) args.width = width;
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.SET_PANO_RENDERING_MODE,
+    operationArgs: args
+  });
+};
+
 // ── Camera ──
 
 /** Returns the current camera parameters (position, rotation, fov, etc.). */
@@ -371,9 +396,9 @@ SiteViewSDK.setCameraLookAt = function (x, y, z) {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.SET_CAMERA_LOOKAT,
     operationArgs: {
-      x: x,
-      y: y,
-      z: z
+      lookAtX: x,
+      lookAtY: y,
+      lookAtZ: z
     }
   });
 };
@@ -569,6 +594,63 @@ SiteViewSDK.unloadAnnotations = function (annotationIds) {
   });
 };
 
+/**
+ * @param {number} annotationId
+ * @param {Object} colors
+ * @param {string|null} [colors.foregroundColor] - hex color (e.g. '#ffffff'), null to reset, omit to keep
+ * @param {string|null} [colors.backgroundColor] - hex color (e.g. '#ff5722'), null to reset, omit to keep
+ */
+SiteViewSDK.setAnnotationUserColor = function (annotationId, colors) {
+  var args = {
+    annotationId: annotationId
+  };
+  if (colors) {
+    if ('foregroundColor' in colors) args.foregroundColor = colors.foregroundColor;
+    if ('backgroundColor' in colors) args.backgroundColor = colors.backgroundColor;
+  }
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.SET_ANNOTATION_USER_COLOR,
+    operationArgs: args
+  });
+};
+
+/**
+ * Starts annotation relocation mode (pano mode only).
+ * The user picks a new position in the viewer; a completed pick broadcasts
+ * an ANNOTATION_RELOCATION_POSITION_PICKED event and ends the pick cursor.
+ * Call this again to re-pick (the session and the original position are preserved).
+ * Positions are applied locally only until completeAnnotationRelocation() commits to the server.
+ * @param {number} [annotationId] - Target annotation ID. Omit to relocate the active annotation.
+ */
+SiteViewSDK.startAnnotationRelocation = function (annotationId) {
+  var args = {};
+  if (annotationId !== undefined) args.annotationId = annotationId;
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.START_ANNOTATION_RELOCATION,
+    operationArgs: args
+  });
+};
+
+/**
+ * Commits the last picked position to the server and ends relocation mode.
+ * @param {boolean} [updateViewpoint] - Also save the current camera as the annotation viewpoint (default: true).
+ */
+SiteViewSDK.completeAnnotationRelocation = function (updateViewpoint) {
+  var args = {};
+  if (updateViewpoint !== undefined) args.updateViewpoint = updateViewpoint;
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.COMPLETE_ANNOTATION_RELOCATION,
+    operationArgs: args
+  });
+};
+
+/** Cancels relocation mode and reverts the annotation to its original position. */
+SiteViewSDK.cancelAnnotationRelocation = function () {
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.CANCEL_ANNOTATION_RELOCATION
+  });
+};
+
 // ── Omninote ──
 
 /** @param {string[]} omninoteKeys */
@@ -577,6 +659,56 @@ SiteViewSDK.loadOmninotes = function (omninoteKeys) {
     operationType: OPERATION_TYPE.LOAD_OMNINOTES,
     operationArgs: {
       omninoteKeys: omninoteKeys
+    }
+  });
+};
+
+/** @param {string} omninoteKey */
+SiteViewSDK.lookAtOmninote = function (omninoteKey) {
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.LOOK_AT_OMNINOTE,
+    operationArgs: {
+      omninoteKey: omninoteKey
+    }
+  });
+};
+
+/** @param {string} omninoteKey */
+SiteViewSDK.setActiveOmninote = function (omninoteKey) {
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.SET_ACTIVE_OMNINOTE,
+    operationArgs: {
+      omninoteKey: omninoteKey
+    }
+  });
+};
+
+/** Clears the currently active omninote selection. */
+SiteViewSDK.resetActiveOmninote = function () {
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.RESET_ACTIVE_OMNINOTE
+  });
+};
+
+/** @param {number[]} omninoteTagIds @param {boolean} visible @param {boolean} [showThisOnly] */
+SiteViewSDK.setOmninoteTagVisibility = function (omninoteTagIds, visible, showThisOnly) {
+  var args = {
+    omninoteTagIds: omninoteTagIds,
+    visible: visible
+  };
+  if (showThisOnly !== undefined) args.showThisOnly = showThisOnly;
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.SET_OMNINOTE_TAG_VISIBILITY,
+    operationArgs: args
+  });
+};
+
+/** @param {boolean} visible */
+SiteViewSDK.setOmninoteTagAllVisibility = function (visible) {
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.SET_OMNINOTE_TAG_ALL_VISIBILITY,
+    operationArgs: {
+      visible: visible
     }
   });
 };
