@@ -5,3 +5,5 @@ dist
 *.log
 .idea/
 .vscode/
+test-results/
+playwright-report/

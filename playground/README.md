@@ -18,6 +18,7 @@
     - [Change Pano View Mode](#change-pano-view-mode)
     - [Change Active View](#change-active-view)
     - [Change Pano Visibility Mode](#change-pano-visibility-mode)
+    - [Set Pano Rendering Mode](#set-pano-rendering-mode)
   - [Camera](#camera)
     - [Get Camera Parameters](#get-camera-parameters)
     - [Set Camera Parameters](#set-camera-parameters)
@@ -42,8 +43,12 @@
     - [Set Filter](#set-filter)
     - [Set Annotation Group Visibility](#set-annotation-group-visibility)
     - [Set Annotation Group All Visibility](#set-annotation-group-all-visibility)
+    - [Start Annotation Relocation](#start-annotation-relocation)
+    - [Complete Annotation Relocation](#complete-annotation-relocation)
+    - [Cancel Annotation Relocation](#cancel-annotation-relocation)
   - [Omninote](#omninote)
     - [Load Omninotes](#load-omninotes)
+    - [Look At Omninote](#look-at-omninote)
     - [Unload Omninotes](#unload-omninotes)
   - [Refplan](#refplan)
     - [Enable Refplan](#enable-refplan)
@@ -61,6 +66,9 @@
     - [Pano View Mode Changed](#pano-view-mode-changed)
     - [Active Annotation Changed](#active-annotation-changed)
     - [Active Annotation Reset](#active-annotation-reset)
+    - [Annotation Relocation Started](#annotation-relocation-started)
+    - [Annotation Relocation Position Picked](#annotation-relocation-position-picked)
+    - [Annotation Relocation Ended](#annotation-relocation-ended)
     - [Level Changed](#level-changed)
     - [Capture Changed](#capture-changed)
     - [Opacity Changed](#opacity-changed)
@@ -95,6 +103,7 @@ SiteViewSDK.init('cupix-container', '[your Headless SiteView URL]', { apiToken: 
 ```
 
 Your auth info is in the form of `{ accessCode?: string, apiToken?: string }`, with `apiToken` taking priority over `accessCode`.
+In the playground header, select `API token` to pass `cupix_api_token`, or `Access code` to pass `access_code`. If a private SiteView URL loads with a 401 before SDK APIs are called, the iframe is missing a valid auth value or the saved browser session is expired.
 
 ### Listen for messages from the Headless SiteView iframe
 
@@ -312,6 +321,25 @@ Response
 
 ```js
 {}
+```
+
+### Set Pano Rendering Mode
+
+Change pano rendering mode. In `CUBEMAP` mode, pass only the output width. Height is derived by the viewer as `floor(width / 6)`.
+
+```js
+SiteViewSDK.setPanoRenderingMode(renderingMode, width);
+```
+
+| Property      | Type                      | Description                      | Required |
+| ------------- | ------------------------- | -------------------------------- | -------- |
+| renderingMode | `'NORMAL'` \| `'CUBEMAP'` | Pano rendering mode              | true     |
+| width         | `number`                  | Cubemap output width             | false    |
+
+Response
+
+```js
+{ renderingMode: string, width?: number }
 ```
 
 ## Camera
@@ -707,6 +735,69 @@ Response
 {}
 ```
 
+### Start Annotation Relocation
+
+Start annotation relocation mode (pano mode only). A pick cursor is activated in the viewer;
+when the user clicks and the position is confirmed, an
+[Annotation Relocation Position Picked](#annotation-relocation-position-picked) event is broadcast
+and the pick cursor ends (single-pick, same as the CupixWorks Relocate annotation behavior).
+Call Start again to re-pick — the session and the original position are preserved.
+Picked positions are applied locally only — nothing is saved to the server until
+[Complete Annotation Relocation](#complete-annotation-relocation) is called.
+
+Starting relocation for another annotation cancels the previous session first.
+The session is also canceled automatically when the user presses ESC in the viewer,
+the level/capture changes, or the viewer switches to BIM mode.
+
+```js
+SiteViewSDK.startAnnotationRelocation(annotationId);
+```
+
+| Property     | Type     | Description                                              | Required |
+| ------------ | -------- | -------------------------------------------------------- | -------- |
+| annotationId | `number` | Annotation ID. Omit to relocate the active annotation.   | false    |
+
+Response
+
+```js
+{ annotationId: number, annotationKey: string }
+```
+
+### Complete Annotation Relocation
+
+Commit the last picked position to the server and end relocation mode.
+By default the current camera is also saved as the annotation viewpoint, so that
+selecting the annotation later moves the camera to look at the new position.
+If the server update fails, the session stays alive so Complete can be retried or canceled.
+
+```js
+SiteViewSDK.completeAnnotationRelocation(updateViewpoint);
+```
+
+| Property        | Type      | Description                                                       | Required |
+| --------------- | --------- | ----------------------------------------------------------------- | -------- |
+| updateViewpoint | `boolean` | Also save the current camera as the viewpoint. Default: `true`.   | false    |
+
+Response
+
+```js
+{ annotationId: number, position: number[] }
+```
+
+### Cancel Annotation Relocation
+
+Cancel relocation mode and revert the annotation to its original position.
+
+```js
+SiteViewSDK.cancelAnnotationRelocation();
+```
+
+Response
+
+```js
+{ annotationId: number }
+```
+
 ## Omninote
 
 ### Load Omninotes
@@ -725,6 +816,24 @@ Response
 
 ```js
 {}
+```
+
+### Look At Omninote
+
+Move the pano camera to the omninote's parent pano and look at the omninote.
+
+```js
+SiteViewSDK.lookAtOmninote(omninoteKey);
+```
+
+| Property    | Type     | Description  | Required |
+| ----------- | -------- | ------------ | -------- |
+| omninoteKey | `string` | Omninote key | true     |
+
+Response
+
+```js
+{ omninoteKey: string, panoId?: number, cameraParameters?: object }
 ```
 
 ### Unload Omninotes
@@ -930,6 +1039,36 @@ Emitted when the active annotation is cleared.
 | Property             | Type     | Description             |
 | -------------------- | -------- | ----------------------- |
 | previousAnnotationId | `number` | Previously active annotation ID |
+
+### Annotation Relocation Started
+
+Emitted when annotation relocation mode starts.
+
+| Property     | Type     | Description   |
+| ------------ | -------- | ------------- |
+| annotationId | `number` | Annotation ID |
+
+### Annotation Relocation Position Picked
+
+Emitted when the user picks (confirms) a new annotation position in the viewer during relocation mode.
+The pick cursor ends after a confirmed pick; call Start again to re-pick.
+The position is applied locally only until [Complete Annotation Relocation](#complete-annotation-relocation) commits it.
+
+| Property     | Type       | Description                    |
+| ------------ | ---------- | ------------------------------ |
+| annotationId | `number`   | Annotation ID                  |
+| position     | `number[]` | Picked position `[x, y, z]`    |
+
+### Annotation Relocation Ended
+
+Emitted when annotation relocation mode ends. `status: 'completed'` means the position was
+saved to the server; `status: 'canceled'` means the annotation was reverted to its original position.
+
+| Property     | Type       | Description                       |
+| ------------ | ---------- | --------------------------------- |
+| annotationId | `number`   | Annotation ID                     |
+| position     | `number[]` | Final position `[x, y, z]`        |
+| status       | `string`   | `'completed'` or `'canceled'`     |
 
 ### Level Changed
 

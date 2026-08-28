@@ -48,7 +48,8 @@
       #header-controls label {
         color: #94a3b8;
       }
-      #header-controls input {
+      #header-controls input,
+      #header-controls select {
         background: #0f172a;
         border: 1px solid #475569;
         border-radius: 4px;
@@ -57,7 +58,8 @@
         font-size: 12px;
         font-family: 'SF Mono', monospace;
       }
-      #header-controls input:focus {
+      #header-controls input:focus,
+      #header-controls select:focus {
         outline: 1px solid #38bdf8;
       }
       #header-controls input.url-input {
@@ -65,6 +67,9 @@
       }
       #header-controls input.token-input {
         width: 180px;
+      }
+      #header-controls select.auth-type-input {
+        width: 110px;
       }
       #btn-connect {
         padding: 4px 12px;
@@ -270,7 +275,11 @@
         <label>URL</label>
         <input id="input-url" class="url-input" type="text" value="https://apidemo.cupix.works/hsv/9hivpe82w8" />
         <label>Token</label>
-        <input id="input-token" class="token-input" type="text" placeholder="API token (optional)" />
+        <select id="input-auth-type" class="auth-type-input" aria-label="Authentication type">
+          <option value="apiToken">API token</option>
+          <option value="accessCode">Access code</option>
+        </select>
+        <input id="input-token" class="token-input" type="text" placeholder="Auth value (optional)" />
         <button id="btn-connect" onclick="connectViewer()">Connect</button>
       </div>
     </div>
@@ -320,11 +329,11 @@
         <div class="section">
           <div class="section-title">Document</div>
           <div class="btn-group">
-            <button onclick="Playground.getDocument()">getDocument</button>
-            <button onclick="Playground.getSiteview()">getSiteview</button>
-            <button onclick="Playground.getActiveLevel()">getActiveLevel</button>
-            <button onclick="Playground.getActiveCapture()">getActiveCapture</button>
-            <button onclick="Playground.isDocumentLoaded()">isDocumentLoaded</button>
+            <button onclick="Playground.getDocument()" title="SiteViewSDK.getDocument">Document</button>
+            <button onclick="Playground.getSiteview()" title="SiteViewSDK.getSiteview">SiteView</button>
+            <button onclick="Playground.getActiveLevel()" title="SiteViewSDK.getActiveLevel">Level</button>
+            <button onclick="Playground.getActiveCapture()" title="SiteViewSDK.getActiveCapture">Capture</button>
+            <button onclick="Playground.isDocumentLoaded()" title="SiteViewSDK.isDocumentLoaded">Loaded?</button>
           </div>
         </div>
         <div class="section">
@@ -350,13 +359,18 @@
             <button class="btn-option" onclick="Playground.changePanoVisibilityMode('PANO')">PANO</button>
             <button class="btn-option" onclick="Playground.changePanoVisibilityMode('3D')">3D</button>
           </div>
+          <div class="sub-label">Pano Rendering Mode</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setPanoRenderingMode('NORMAL')">NORMAL</button>
+            <button class="btn-option" onclick="Playground.setPanoRenderingModeCubemapPrompt()">CUBEMAP...</button>
+          </div>
         </div>
         <div class="section">
           <div class="section-title">Camera</div>
           <div class="btn-group">
-            <button onclick="Playground.getCameraParameters()">getCameraParameters</button>
-            <button onclick="Playground.setCameraParametersPrompt()">setCameraParameters...</button>
-            <button onclick="Playground.resetView()">resetView</button>
+            <button onclick="Playground.getCameraParameters()" title="SiteViewSDK.getCameraParameters">Get Params</button>
+            <button onclick="Playground.setCameraParametersPrompt()" title="SiteViewSDK.setCameraParameters">Set Params...</button>
+            <button onclick="Playground.resetView()" title="SiteViewSDK.resetView">Reset</button>
           </div>
           <div class="sub-label">Rotate</div>
           <div class="btn-group">
@@ -367,7 +381,7 @@
           </div>
           <div class="sub-label">Look At</div>
           <div class="btn-group">
-            <button onclick="Playground.setCameraLookAtPrompt()">setCameraLookAt...</button>
+            <button onclick="Playground.setCameraLookAtPrompt()" title="SiteViewSDK.setCameraLookAt">Point...</button>
           </div>
           <div class="sub-label">Move</div>
           <div class="btn-group">
@@ -392,47 +406,66 @@
         <div class="section">
           <div class="section-title">Navigation</div>
           <div class="btn-group">
-            <button onclick="Playground.changeLevelCapturePrompt()">changeLevelCapture...</button>
-            <button onclick="Playground.changePanoPrompt()">changePano...</button>
-            <button onclick="Playground.changeBimPrompt()">changeBim...</button>
+            <button onclick="Playground.changeLevelCapturePrompt()" title="SiteViewSDK.changeLevelCapture">Level+Cap...</button>
+            <button onclick="Playground.changePanoPrompt()" title="SiteViewSDK.changePano">Pano...</button>
+            <button onclick="Playground.changeBimPrompt()" title="SiteViewSDK.changeBim">BIM...</button>
           </div>
         </div>
         <div class="section">
           <div class="section-title">Annotation</div>
           <div class="btn-group">
-            <button onclick="Playground.setActiveAnnotationPrompt()">setActiveAnnotation...</button>
-            <button onclick="Playground.resetActiveAnnotation()">resetActiveAnnotation</button>
-            <button onclick="Playground.loadAnnotationPrompt()">loadAnnotation...</button>
-            <button onclick="Playground.addAnnotationFormPrompt()">addAnnotationForm...</button>
+            <button onclick="Playground.setActiveAnnotationPrompt()" title="SiteViewSDK.setActiveAnnotation">Activate...</button>
+            <button onclick="Playground.resetActiveAnnotation()" title="SiteViewSDK.resetActiveAnnotation">Reset</button>
+            <button onclick="Playground.loadAnnotationPrompt()" title="SiteViewSDK.loadAnnotation">Load...</button>
+            <button onclick="Playground.addAnnotationFormPrompt()" title="SiteViewSDK.addAnnotationForm">Add Form...</button>
           </div>
           <div class="sub-label">Load</div>
           <div class="btn-group">
-            <button onclick="Playground.loadAnnotationGroupPrompt()">loadAnnotationGroup...</button>
+            <button onclick="Playground.loadAnnotationGroupPrompt()" title="SiteViewSDK.loadAnnotationGroup">Group...</button>
           </div>
           <div class="sub-label">Filter</div>
           <div class="btn-group">
-            <button onclick="Playground.setFilterPrompt()">setFilter...</button>
+            <button onclick="Playground.setFilterPrompt()" title="SiteViewSDK.setFilter">Set...</button>
+          </div>
+          <div class="sub-label">User Color</div>
+          <div class="btn-group">
+            <button onclick="Playground.setAnnotationUserColorPrompt()" title="SiteViewSDK.setAnnotationUserColor">Set...</button>
+          </div>
+          <div class="sub-label">Relocation</div>
+          <div class="btn-group">
+            <button onclick="Playground.startAnnotationRelocationPrompt()" title="SiteViewSDK.startAnnotationRelocation">Start...</button>
+            <button onclick="Playground.completeAnnotationRelocation()" title="SiteViewSDK.completeAnnotationRelocation">Complete</button>
+            <button onclick="Playground.cancelAnnotationRelocation()" title="SiteViewSDK.cancelAnnotationRelocation">Cancel</button>
           </div>
           <div class="sub-label">Annotation Group Visibility</div>
           <div class="btn-group">
-            <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(true)">showAll</button>
-            <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(false)">hideAll</button>
-            <button onclick="Playground.setAnnotationGroupVisibilityPrompt()">setAnnotationGroupVisibility...</button>
+            <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(true)" title="SiteViewSDK.setAnnotationGroupAllVisibility(true)">Show All</button>
+            <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(false)" title="SiteViewSDK.setAnnotationGroupAllVisibility(false)">Hide All</button>
+            <button onclick="Playground.setAnnotationGroupVisibilityPrompt()" title="SiteViewSDK.setAnnotationGroupVisibility">Group...</button>
           </div>
         </div>
         <div class="section">
           <div class="section-title">Omninote</div>
           <div class="btn-group">
-            <button onclick="Playground.loadOmninotesPrompt()">loadOmninotes...</button>
-            <button onclick="Playground.unloadOmninotesPrompt()">unloadOmninotes...</button>
+            <button onclick="Playground.loadOmninotesPrompt()" title="SiteViewSDK.loadOmninotes">Load...</button>
+            <button onclick="Playground.lookAtOmninotePrompt()" title="SiteViewSDK.lookAtOmninote">Look At...</button>
+            <button onclick="Playground.setActiveOmninotePrompt()" title="SiteViewSDK.setActiveOmninote">Activate...</button>
+            <button onclick="Playground.resetActiveOmninote()" title="SiteViewSDK.resetActiveOmninote">Reset</button>
+            <button onclick="Playground.unloadOmninotesPrompt()" title="SiteViewSDK.unloadOmninotes">Unload...</button>
+          </div>
+          <div class="sub-label">Tag Visibility</div>
+          <div class="btn-group">
+            <button class="btn-option" onclick="Playground.setOmninoteTagAllVisibility(true)" title="SiteViewSDK.setOmninoteTagAllVisibility(true)">Show All</button>
+            <button class="btn-option" onclick="Playground.setOmninoteTagAllVisibility(false)" title="SiteViewSDK.setOmninoteTagAllVisibility(false)">Hide All</button>
+            <button onclick="Playground.setOmninoteTagVisibilityPrompt()" title="SiteViewSDK.setOmninoteTagVisibility">Tags...</button>
           </div>
         </div>
         <div class="section">
           <div class="section-title">Refplan</div>
           <div class="btn-group">
-            <button onclick="Playground.enableRefplan()">enableRefplan</button>
-            <button onclick="Playground.getRefplansOfLevelPrompt()">getRefplansOfLevel...</button>
-            <button onclick="Playground.setActiveRefplanPrompt()">setActiveRefplan...</button>
+            <button onclick="Playground.enableRefplan()" title="SiteViewSDK.enableRefplan">Enable</button>
+            <button onclick="Playground.getRefplansOfLevelPrompt()" title="SiteViewSDK.getRefplansOfLevel">By Level...</button>
+            <button onclick="Playground.setActiveRefplanPrompt()" title="SiteViewSDK.setActiveRefplan">Activate...</button>
           </div>
         </div>
         <div class="section">
