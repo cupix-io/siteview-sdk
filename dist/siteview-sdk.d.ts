@@ -7,6 +7,27 @@ export interface AuthOptions {
   apiToken?: string;
 }
 
+export interface PresignedAuth {
+  client_id: string;
+  timestamp: string;
+  signature: string;
+}
+
+export interface AuthenticationResult {
+  authenticated?: true;
+  error?: string;
+  errorMessage?: string;
+}
+
+export interface LoadAnnotationsResult {
+  /** Successful responses have no error; preserves direct error checks in existing SDK consumers. */
+  error?: never;
+  /** Annotation IDs added to or refreshed in the viewer document */
+  loadedIds: number[];
+  /** Requested annotation IDs that were not loaded (rejected by the server or incomplete data) */
+  failedIds: number[];
+}
+
 export interface BimEntry {
   bim: number;
   model?: number;
@@ -14,6 +35,7 @@ export interface BimEntry {
 
 export declare const OPERATION_TYPE: {
   // System
+  readonly AUTHENTICATE: 'AUTHENTICATE';
   readonly HEADLESS_VIEWER_API_START: 'HEADLESS_VIEWER_API_START';
   readonly HEADLESS_VIEWER_API_STOP: 'HEADLESS_VIEWER_API_STOP';
 
@@ -91,6 +113,7 @@ interface SiteViewSDK {
 
   // System
   init(htmlDivId: string, siteviewUrl: string, auth?: AuthOptions): Promise<void>;
+  authenticate(credential: PresignedAuth): Promise<AuthenticationResult>;
   start(timeout?: number): Promise<ErrorType>;
   stop(): Promise<ErrorType>;
 
@@ -131,7 +154,7 @@ interface SiteViewSDK {
   setAnnotationGroupAllVisibility(visible: boolean): Promise<ErrorType>;
   setAnnotationGroupVisibility(annotationGroupIds: number[], visible: boolean, showThisOnly?: boolean): Promise<ErrorType>;
   loadAnnotation(annotationId: number): Promise<ErrorType>;
-  loadAnnotations(annotationIds: number[]): Promise<ErrorType>;
+  loadAnnotations(annotationIds: number[]): Promise<LoadAnnotationsResult | ErrorType>;
   loadAnnotationGroup(annotationGroupIds: number[]): Promise<ErrorType>;
   unloadAnnotations(annotationIds: number[]): Promise<ErrorType>;
   setAnnotationUserColor(annotationId: number, colors: { foregroundColor?: string | null; backgroundColor?: string | null }): Promise<ErrorType>;

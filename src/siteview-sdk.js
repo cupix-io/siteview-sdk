@@ -4,6 +4,7 @@
  */
 const OPERATION_TYPE = {
   // System
+  AUTHENTICATE: 'AUTHENTICATE',
   HEADLESS_VIEWER_API_START: 'HEADLESS_VIEWER_API_START',
   HEADLESS_VIEWER_API_STOP: 'HEADLESS_VIEWER_API_STOP',
 
@@ -88,6 +89,7 @@ const OPERATION_TYPE = {
 
 const resolvers = {};
 let readyResolve;
+let cupixOrigin;
 
 /**
  * @typedef {Object} SiteViewSDK
@@ -121,11 +123,16 @@ SiteViewSDK.init = async function (htmlDivId, siteviewUrl, auth) {
   auth = auth || {};
   var elem = document.getElementById(htmlDivId);
   if (!elem) return;
+  cupixOrigin = new URL(siteviewUrl, document.baseURI).origin;
 
   if (auth.apiToken) siteviewUrl += (siteviewUrl.indexOf('?') === -1 ? '?' : '&') + 'cupix_api_token=' + auth.apiToken;
   else if (auth.accessCode) siteviewUrl += (siteviewUrl.indexOf('?') === -1 ? '?' : '&') + 'access_code=' + auth.accessCode;
 
   // Reset state for re-init
+  Object.keys(resolvers).forEach(function (id) {
+    if (resolvers[id]) resolvers[id]({ error: 'reinitialized' });
+    delete resolvers[id];
+  });
   SiteViewSDK.ready = false;
   SiteViewSDK.uuid = 0;
   SiteViewSDK.cupixWindow = null;
@@ -162,34 +169,67 @@ SiteViewSDK.sendToCupix = async function (event, waitReady) {
     console.warn('[SiteViewSDK] Not initialized. Call init() first.');
     return { error: 'not_initialized' };
   }
+  const target = SiteViewSDK.cupixWindow;
+  const targetOrigin = cupixOrigin;
 
   event.header = 'CUPIXWORKS_HEADLESS_VIEWER_API';
   event.sourceUUID = 'siteview-sdk';
-  event.uuid = SiteViewSDK.uuid.toString();
+  var id = SiteViewSDK.uuid++;
+  event.uuid = id.toString();
   event.timestamp = Date.now();
   var timeout = waitReady || 10000;
   var error = { error: 'timeout: ' + event.operationType + ' ' + timeout + 'ms' };
 
   var promise = new Promise(function (resolve) {
-    var id = SiteViewSDK.uuid;
     resolvers[id] = resolve;
     setTimeout(function () {
-      if (resolvers[id]) {
+      if (resolvers[id] === resolve) {
         resolve(error);
         resolvers[id] = null;
       }
     }, timeout);
   });
 
-  await SiteViewSDK.readyPromise;
-  SiteViewSDK.cupixWindow.postMessage(event, '*');
-  if (!SiteViewSDK.quiet) console.log('sendToCupix: [' + event.operationType + ']', JSON.stringify(event));
+  if (event.operationType === OPERATION_TYPE.AUTHENTICATE) {
+    await waitForAuthenticationReady(timeout);
+  } else {
+    await SiteViewSDK.readyPromise;
+  }
+  if (!resolvers[id] || target !== SiteViewSDK.cupixWindow) return promise;
+  target.postMessage(event, targetOrigin);
+  if (!SiteViewSDK.quiet && event.operationType !== OPERATION_TYPE.AUTHENTICATE) {
+    console.log('sendToCupix: [' + event.operationType + ']', JSON.stringify(event));
+  }
 
-  SiteViewSDK.uuid++;
   return promise;
 };
 
 // ── System ──
+
+function waitForAuthenticationReady(timeout) {
+  const target = SiteViewSDK.cupixWindow;
+  const startedAt = Date.now();
+  return new Promise(function (resolve) {
+    const probe = function () {
+      if (SiteViewSDK.ready || Date.now() - startedAt >= timeout || target !== SiteViewSDK.cupixWindow) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+      target.postMessage({
+        header: 'CUPIXWORKS_HEADLESS_VIEWER_API', sourceUUID: 'siteview-sdk', uuid: 'auth-ready',
+        operationType: OPERATION_TYPE.HEADLESS_VIEWER_API_START, timestamp: Date.now()
+      }, cupixOrigin);
+    };
+    const timer = setInterval(probe, 100);
+    probe();
+  });
+}
+
+/** Authenticate a use_sdk_auth=1 viewer with presigned credentials, without placing them in its URL. */
+SiteViewSDK.authenticate = function (credential) {
+  return SiteViewSDK.sendToCupix({ operationType: OPERATION_TYPE.AUTHENTICATE, operationArgs: credential }, 15000);
+};
 
 /** @param {number} [timeout] */
 SiteViewSDK.start = function (timeout) {
@@ -386,7 +426,10 @@ SiteViewSDK.loadAnnotation = function (annotationId) {
   return SiteViewSDK.sendToCupix({ operationType: OPERATION_TYPE.LOAD_ANNOTATION, operationArgs: { annotationId: annotationId } });
 };
 
-/** @param {number[]} annotationIds */
+/**
+ * @param {number[]} annotationIds
+ * @returns {Promise<{ loadedIds: number[], failedIds: number[] }>} IDs rejected by the server are reported in failedIds; the rest are still loaded
+ */
 SiteViewSDK.loadAnnotations = function (annotationIds) {
   return SiteViewSDK.sendToCupix({ operationType: OPERATION_TYPE.LOAD_ANNOTATIONS, operationArgs: { annotationIds: annotationIds } });
 };
@@ -547,7 +590,10 @@ window.addEventListener(
     var response = e && e.data;
     if (response == undefined) return;
     if (response.header != 'CUPIXWORKS_HEADLESS_VIEWER_API') return;
-    if (!SiteViewSDK.quiet) log('[CUPIXWORKS_HEADLESS_VIEWER_API] ' + JSON.stringify(response || {}));
+    if (cupixOrigin && e.origin !== cupixOrigin) return;
+    if (!SiteViewSDK.quiet && response.responseType !== 'AUTHENTICATE_RESPONSE') {
+      log('[CUPIXWORKS_HEADLESS_VIEWER_API] ' + JSON.stringify(response || {}));
+    }
     setReady();
     if (response.request && response.request.uuid && typeof resolvers[response.request.uuid] === 'function') {
       resolvers[response.request.uuid](response.response || response);

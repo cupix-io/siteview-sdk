@@ -34,6 +34,7 @@ function _asyncToGenerator(n) { return function () { var t = this, e = arguments
  */
 var OPERATION_TYPE = {
   // System
+  AUTHENTICATE: 'AUTHENTICATE',
   HEADLESS_VIEWER_API_START: 'HEADLESS_VIEWER_API_START',
   HEADLESS_VIEWER_API_STOP: 'HEADLESS_VIEWER_API_STOP',
   // Document
@@ -110,6 +111,7 @@ var OPERATION_TYPE = {
 
 var resolvers = {};
 var readyResolve;
+var cupixOrigin;
 
 /**
  * @typedef {Object} SiteViewSDK
@@ -151,9 +153,16 @@ SiteViewSDK.init = /*#__PURE__*/function () {
           }
           return _context.a(2);
         case 1:
+          cupixOrigin = new URL(siteviewUrl, document.baseURI).origin;
           if (auth.apiToken) siteviewUrl += (siteviewUrl.indexOf('?') === -1 ? '?' : '&') + 'cupix_api_token=' + auth.apiToken;else if (auth.accessCode) siteviewUrl += (siteviewUrl.indexOf('?') === -1 ? '?' : '&') + 'access_code=' + auth.accessCode;
 
           // Reset state for re-init
+          Object.keys(resolvers).forEach(function (id) {
+            if (resolvers[id]) resolvers[id]({
+              error: 'reinitialized'
+            });
+            delete resolvers[id];
+          });
           SiteViewSDK.ready = false;
           SiteViewSDK.uuid = 0;
           SiteViewSDK.cupixWindow = null;
@@ -191,7 +200,7 @@ SiteViewSDK.init = /*#__PURE__*/function () {
  */
 SiteViewSDK.sendToCupix = /*#__PURE__*/function () {
   var _ref2 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2(event, waitReady) {
-    var timeout, error, promise;
+    var target, targetOrigin, id, timeout, error, promise;
     return _regenerator().w(function (_context2) {
       while (1) switch (_context2.n) {
         case 0:
@@ -204,30 +213,49 @@ SiteViewSDK.sendToCupix = /*#__PURE__*/function () {
             error: 'not_initialized'
           });
         case 1:
+          target = SiteViewSDK.cupixWindow;
+          targetOrigin = cupixOrigin;
           event.header = 'CUPIXWORKS_HEADLESS_VIEWER_API';
           event.sourceUUID = 'siteview-sdk';
-          event.uuid = SiteViewSDK.uuid.toString();
+          id = SiteViewSDK.uuid++;
+          event.uuid = id.toString();
           event.timestamp = Date.now();
           timeout = waitReady || 10000;
           error = {
             error: 'timeout: ' + event.operationType + ' ' + timeout + 'ms'
           };
           promise = new Promise(function (resolve) {
-            var id = SiteViewSDK.uuid;
             resolvers[id] = resolve;
             setTimeout(function () {
-              if (resolvers[id]) {
+              if (resolvers[id] === resolve) {
                 resolve(error);
                 resolvers[id] = null;
               }
             }, timeout);
           });
+          if (!(event.operationType === OPERATION_TYPE.AUTHENTICATE)) {
+            _context2.n = 3;
+            break;
+          }
           _context2.n = 2;
-          return SiteViewSDK.readyPromise;
+          return waitForAuthenticationReady(timeout);
         case 2:
-          SiteViewSDK.cupixWindow.postMessage(event, '*');
-          if (!SiteViewSDK.quiet) console.log('sendToCupix: [' + event.operationType + ']', JSON.stringify(event));
-          SiteViewSDK.uuid++;
+          _context2.n = 4;
+          break;
+        case 3:
+          _context2.n = 4;
+          return SiteViewSDK.readyPromise;
+        case 4:
+          if (!(!resolvers[id] || target !== SiteViewSDK.cupixWindow)) {
+            _context2.n = 5;
+            break;
+          }
+          return _context2.a(2, promise);
+        case 5:
+          target.postMessage(event, targetOrigin);
+          if (!SiteViewSDK.quiet && event.operationType !== OPERATION_TYPE.AUTHENTICATE) {
+            console.log('sendToCupix: [' + event.operationType + ']', JSON.stringify(event));
+          }
           return _context2.a(2, promise);
       }
     }, _callee2);
@@ -238,6 +266,37 @@ SiteViewSDK.sendToCupix = /*#__PURE__*/function () {
 }();
 
 // ── System ──
+
+function waitForAuthenticationReady(timeout) {
+  var target = SiteViewSDK.cupixWindow;
+  var startedAt = Date.now();
+  return new Promise(function (resolve) {
+    var probe = function probe() {
+      if (SiteViewSDK.ready || Date.now() - startedAt >= timeout || target !== SiteViewSDK.cupixWindow) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+      target.postMessage({
+        header: 'CUPIXWORKS_HEADLESS_VIEWER_API',
+        sourceUUID: 'siteview-sdk',
+        uuid: 'auth-ready',
+        operationType: OPERATION_TYPE.HEADLESS_VIEWER_API_START,
+        timestamp: Date.now()
+      }, cupixOrigin);
+    };
+    var timer = setInterval(probe, 100);
+    probe();
+  });
+}
+
+/** Authenticate a use_sdk_auth=1 viewer with presigned credentials, without placing them in its URL. */
+SiteViewSDK.authenticate = function (credential) {
+  return SiteViewSDK.sendToCupix({
+    operationType: OPERATION_TYPE.AUTHENTICATE,
+    operationArgs: credential
+  }, 15000);
+};
 
 /** @param {number} [timeout] */
 SiteViewSDK.start = function (timeout) {
@@ -540,7 +599,10 @@ SiteViewSDK.loadAnnotation = function (annotationId) {
   });
 };
 
-/** @param {number[]} annotationIds */
+/**
+ * @param {number[]} annotationIds
+ * @returns {Promise<{ loadedIds: number[], failedIds: number[] }>} IDs rejected by the server are reported in failedIds; the rest are still loaded
+ */
 SiteViewSDK.loadAnnotations = function (annotationIds) {
   return SiteViewSDK.sendToCupix({
     operationType: OPERATION_TYPE.LOAD_ANNOTATIONS,
@@ -776,7 +838,10 @@ window.addEventListener('message', function (e) {
   var response = e && e.data;
   if (response == undefined) return;
   if (response.header != 'CUPIXWORKS_HEADLESS_VIEWER_API') return;
-  if (!SiteViewSDK.quiet) log('[CUPIXWORKS_HEADLESS_VIEWER_API] ' + JSON.stringify(response || {}));
+  if (cupixOrigin && e.origin !== cupixOrigin) return;
+  if (!SiteViewSDK.quiet && response.responseType !== 'AUTHENTICATE_RESPONSE') {
+    log('[CUPIXWORKS_HEADLESS_VIEWER_API] ' + JSON.stringify(response || {}));
+  }
   setReady();
   if (response.request && response.request.uuid && typeof resolvers[response.request.uuid] === 'function') {
     resolvers[response.request.uuid](response.response || response);

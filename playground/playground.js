@@ -1,39 +1,133 @@
 // ── Connection ──
 
+let connectionVersion = 0;
+let connectedAuthType;
+let authenticationStarted = false;
+let authenticationComplete = false;
+
 (function () {
-  var urlInput = document.getElementById('input-url');
-  var authTypeInput = document.getElementById('input-auth-type');
-  var tokenInput = document.getElementById('input-token');
-  var savedUrl = localStorage.getItem('playground_url');
-  var savedAuthType = localStorage.getItem('playground_auth_type');
-  var savedToken = localStorage.getItem('playground_token');
-  if (savedUrl) urlInput.value = savedUrl;
-  if (savedAuthType) authTypeInput.value = savedAuthType;
-  if (savedToken) tokenInput.value = savedToken;
+  const savedUrl = localStorage.getItem('playground_url');
+  const savedAuthType = localStorage.getItem('playground_auth_type');
+  if (savedUrl) document.getElementById('input-url').value = savedUrl;
+  if (['apiToken', 'accessCode', 'sdkPresigned'].includes(savedAuthType)) {
+    document.getElementById('input-auth-type').value = savedAuthType;
+  }
+  localStorage.removeItem('playground_token');
+  document.getElementById('input-auth-type').addEventListener('change', updateAuthenticationFields);
+  document.getElementById('presigned-fields').addEventListener('submit', authenticateViewer);
+  const groups = Array.from(document.querySelectorAll('.command-section'));
+  let savedOpen;
+  document.getElementById('input-command-search').addEventListener('input', function (event) {
+    const query = event.target.value.trim().toLowerCase();
+    if (query && !savedOpen) savedOpen = groups.map((group) => group.open);
+    let matches = 0;
+    groups.forEach(function (group, index) {
+      const searchable = group.textContent + Array.from(group.querySelectorAll('button')).map((button) => button.getAttribute('onclick')).join(' ');
+      group.hidden = Boolean(query) && !searchable.toLowerCase().includes(query);
+      if (!group.hidden) matches++;
+      if (query) group.open = !group.hidden;
+      else if (savedOpen) group.open = savedOpen[index];
+    });
+    if (!query) savedOpen = undefined;
+    document.getElementById('command-empty').hidden = matches > 0;
+  });
+  updateAuthenticationFields();
 })();
 
-// eslint-disable-next-line no-unused-vars -- called from HTML onclick
-function connectViewer() {
-  const url = document.getElementById('input-url').value;
+function updateAuthenticationFields() {
   const authType = document.getElementById('input-auth-type').value;
-  const token = document.getElementById('input-token').value;
-  if (!url) return;
-
-  localStorage.setItem('playground_url', url);
-  localStorage.setItem('playground_auth_type', authType);
-  localStorage.setItem('playground_token', token);
-
-  const placeholder = document.getElementById('placeholder-text');
-  if (placeholder) placeholder.style.display = 'none';
-
-  const auth = {};
-  if (token && authType === 'accessCode') {
-    auth.accessCode = token;
-  } else if (token) {
-    auth.apiToken = token;
+  document.getElementById('token-fields').hidden = authType === 'sdkPresigned';
+  document.getElementById('presigned-fields').hidden = authType !== 'sdkPresigned';
+  setContent('token-label', authType === 'accessCode' ? 'Access code' : 'API token');
+  document.getElementById('btn-authenticate').disabled =
+    connectedAuthType !== 'sdkPresigned' || authType !== connectedAuthType || authenticationStarted || authenticationComplete;
+  if (connectedAuthType && authType !== connectedAuthType) {
+    setContent('connection-status', 'Authentication mode changed. Click Connect to apply.');
   }
+}
 
-  SiteViewSDK.init('cupix-container', url, auth);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- called from HTML onclick
+async function connectViewer() {
+  const authType = document.getElementById('input-auth-type').value;
+  const token = document.getElementById('input-token').value.trim();
+  let url;
+  try {
+    url = new URL(document.getElementById('input-url').value);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid URL');
+  } catch {
+    setContent('connection-status', 'Enter a valid HTTP or HTTPS viewer URL.');
+    return;
+  }
+  if (authType === 'sdkPresigned') {
+    for (const key of ['presigned_mode', 'client_id', 'timestamp', 'signature', 'token', 'cupix_api_token', 'access_code']) url.searchParams.delete(key);
+    url.searchParams.set('use_sdk_auth', '1');
+  } else {
+    url.searchParams.delete('use_sdk_auth');
+  }
+  document.getElementById('input-url').value = url.href;
+  const savedUrl = new URL(url);
+  for (const key of ['client_id', 'timestamp', 'signature', 'token', 'cupix_api_token', 'access_code']) savedUrl.searchParams.delete(key);
+  localStorage.setItem('playground_url', savedUrl.href);
+  localStorage.setItem('playground_auth_type', authType);
+
+  const version = ++connectionVersion;
+  connectedAuthType = undefined;
+  authenticationStarted = false;
+  authenticationComplete = false;
+  updateAuthenticationFields();
+  setContent('connection-status', 'Connecting…');
+  const auth = {};
+  if (authType === 'accessCode' && token) auth.accessCode = token;
+  if (authType === 'apiToken' && token) auth.apiToken = token;
+  try {
+    await SiteViewSDK.init('cupix-container', url.href, auth);
+    if (version !== connectionVersion) return;
+    connectedAuthType = authType;
+    const placeholder = document.getElementById('placeholder-text');
+    if (placeholder) placeholder.hidden = true;
+    setContent('connection-status', authType === 'sdkPresigned' ? 'Waiting for authenticate()' : 'Viewer connected');
+  } catch {
+    if (version !== connectionVersion) return;
+    setContent('connection-status', 'Connection failed. Check the URL and try again.');
+  }
+  updateAuthenticationFields();
+}
+
+async function authenticateViewer(event) {
+  event.preventDefault();
+  if (document.getElementById('btn-authenticate').disabled) return;
+  const credential = {
+    client_id: document.getElementById('input-client-id').value.trim(),
+    timestamp: document.getElementById('input-timestamp').value.trim(),
+    signature: document.getElementById('input-signature').value.trim()
+  };
+  if (Object.values(credential).some((value) => !value)) {
+    setContent('connection-status', 'Enter Client ID, Timestamp, and Signature.');
+    return;
+  }
+  const version = connectionVersion;
+  authenticationStarted = true;
+  updateAuthenticationFields();
+  setContent('connection-status', 'Authenticating…');
+  setRequestContent('AUTHENTICATE', { client_id: '[redacted]', timestamp: '[redacted]', signature: '[redacted]' });
+  try {
+    const result = await SiteViewSDK.authenticate(credential);
+    if (version !== connectionVersion) return;
+    authenticationComplete = result?.authenticated === true;
+    const error = authenticationComplete ? undefined : 'Authentication failed or timed out. Check credentials and retry.';
+    setResponseContent('AUTHENTICATE', authenticationComplete ? { authenticated: true } : undefined, error);
+    setContent('connection-status', authenticationComplete ? 'Authenticated. Viewer loading started.' : error);
+    if (authenticationComplete) document.getElementById('presigned-fields').reset();
+  } catch {
+    if (version !== connectionVersion) return;
+    setContent('connection-status', 'Authentication failed. Check credentials and retry.');
+    setResponseContent('AUTHENTICATE', undefined, 'Authentication failed.');
+  } finally {
+    if (version === connectionVersion) {
+      authenticationStarted = false;
+      updateAuthenticationFields();
+    }
+  }
 }
 
 // ── Output helpers ──
@@ -107,6 +201,7 @@ window.addEventListener(
     if (response.header != 'CUPIXWORKS_HEADLESS_VIEWER_API') return;
 
     const type = response.responseType;
+    if (type === 'AUTHENTICATE_RESPONSE') return;
 
     if (isCameraEvent(type)) {
       setCameraContent(type, response.response);
@@ -319,7 +414,7 @@ Playground.changePanoVisibilityMode = function (visibilityMode) {
 };
 
 Playground.setPanoRenderingMode = function (renderingMode, width) {
-  var args = { renderingMode: renderingMode };
+  const args = { renderingMode: renderingMode };
   if (width !== undefined) args.width = width;
   callSDK('SET_PANO_RENDERING_MODE', args, function () {
     SiteViewSDK.setPanoRenderingMode(renderingMode, width);
@@ -589,14 +684,14 @@ Playground.setAnnotationUserColorPrompt = async function () {
   sessionStorage.setItem('userColorAnnotationId', result.annotationId);
   sessionStorage.setItem('userFgColor', result.foregroundColor);
   sessionStorage.setItem('userBgColor', result.backgroundColor);
-  var colors = {};
-  var fg = result.foregroundColor.trim();
-  var bg = result.backgroundColor.trim();
+  const colors = {};
+  const fg = result.foregroundColor.trim();
+  const bg = result.backgroundColor.trim();
   if (fg !== '') colors.foregroundColor = fg;
   else colors.foregroundColor = null;
   if (bg !== '') colors.backgroundColor = bg;
   else colors.backgroundColor = null;
-  var args = { annotationId: annotationId, foregroundColor: colors.foregroundColor, backgroundColor: colors.backgroundColor };
+  const args = { annotationId: annotationId, foregroundColor: colors.foregroundColor, backgroundColor: colors.backgroundColor };
   callSDK('SET_ANNOTATION_USER_COLOR', args, function () {
     SiteViewSDK.setAnnotationUserColor(annotationId, colors);
   });
@@ -637,7 +732,7 @@ Playground.cancelAnnotationRelocation = function () {
 Playground.loadOmninotesPrompt = async function () {
   try {
     const str = await Playground.promptString('LOAD_OMNINOTES', 'omninote keys (comma-separated)');
-    var keys = str.split(',').map(function (s) {
+    const keys = str.split(',').map(function (s) {
       return s.trim();
     }).filter(function (s) {
       return s.length > 0;
@@ -721,7 +816,7 @@ Playground.setOmninoteTagAllVisibility = function (visible) {
 Playground.unloadOmninotesPrompt = async function () {
   try {
     const str = await Playground.promptString('UNLOAD_OMNINOTES', 'omninote keys (comma-separated)');
-    var keys = str.split(',').map(function (s) {
+    const keys = str.split(',').map(function (s) {
       return s.trim();
     }).filter(function (s) {
       return s.length > 0;

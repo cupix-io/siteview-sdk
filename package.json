@@ -1,7 +1,7 @@
 {
   "name": "@cupix-sdk/siteview-sdk",
   "description": "CupixWorks SiteView SDK for embedding",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "scripts": {
     "build": "webpack --mode=production --node-env=production",
     "build:dev": "webpack --mode=development",
@@ -16,7 +16,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "main": "./dist/umd/siteview-sdk.min.js",
-  "module": "./dist/esm/siteview-sdk.min.js",
+  "module": "./dist/esm/siteview-sdk.min.mjs",
   "types": "./dist/siteview-sdk.d.ts",
   "license": "MIT",
   "author": "Cupix, Inc.",
@@ -56,6 +56,7 @@
     "html-webpack-plugin": "^5.5.3",
     "jsdom": "^29.0.2",
     "prettier": "^2.7.1",
+    "typescript": "~5.9.2",
     "vitest": "^4.1.4",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.10.0",
