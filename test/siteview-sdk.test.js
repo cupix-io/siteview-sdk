@@ -17,6 +17,7 @@ describe('OPERATION_TYPE', () => {
   });
 
   const expectedTypes = [
+    'AUTHENTICATE',
     'HEADLESS_VIEWER_API_START',
     'HEADLESS_VIEWER_API_STOP',
     'GET_DOCUMENT',

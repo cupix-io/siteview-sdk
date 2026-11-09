@@ -4,6 +4,7 @@
     - [Add a container div](#add-a-container-div)
     - [Listen for messages from the Headless SiteView iframe](#listen-for-messages-from-the-headless-siteview-iframe)
   - [Initialize](#initialize)
+  - [Authenticate](#authenticate)
   - [System](#system)
     - [Start](#start)
     - [Stop](#stop)
@@ -133,6 +134,34 @@ SiteViewSDK.init(htmlDivId, siteviewUrl, auth);
 | auth       | `Object` | Authentication options                                                  | false    |
 | auth.apiToken | `string` | API token for authentication                                         | false    |
 | auth.accessCode | `string` | Access code for the siteview                                       | false    |
+
+## Authenticate
+
+Use `use_sdk_auth=1` to wait for host-provided presigned credentials before loading the document:
+
+```javascript
+await SiteViewSDK.init('viewer', 'https://TEAM.cupix.works/hsv/KEY?use_sdk_auth=1');
+const result = await SiteViewSDK.authenticate({ client_id, timestamp, signature });
+if (result.authenticated !== true) {
+  // Show an error or retry with a fresh credential.
+}
+```
+
+| Argument | Type | Meaning |
+| --- | --- | --- |
+| `client_id` | string | Issued API Client ID |
+| `timestamp` | string | Expiration Unix timestamp in seconds |
+| `signature` | string | HMAC-SHA256 hex signature for the current review key and timestamp |
+
+See [credential generation](../README.md#generate-presigned-credentials) for the signing algorithm and Node.js example.
+The promise resolves with `{ authenticated: true }` on success, or an error result (`errorMessage` or SDK `error`).
+Authentication success starts loading; wait for `DOCUMENT_LOADED` separately before using document APIs.
+Failed authentication can be retried. After success, call `init()` again to use a different credential.
+Do not combine `use_sdk_auth=1` with `presigned_mode=1` or presigned query parameters.
+
+In the Playground, select **Connection → SDK presigned**, click **Connect**, fill the three credential fields, and click **Authenticate**.
+The viewer shows its loading screen while waiting, validating, or after a failed attempt. Name/address appear after successful validation.
+Credentials are not persisted, and the authentication request output is redacted.
 
 ## System
 
@@ -640,8 +669,10 @@ SiteViewSDK.loadAnnotations(annotationIds);
 Response
 
 ```js
-{}
+{ loadedIds: number[], failedIds: number[] }
 ```
+
+Each ID is fetched individually. IDs that could not be loaded (e.g. rejected by the server with 403) are listed in `failedIds` while the others are still loaded; every requested ID appears in exactly one of the two arrays, and a fully failed batch resolves with `loadedIds: []` instead of an error.
 
 ### Load Annotation Group
 

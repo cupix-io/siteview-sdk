@@ -11,7 +11,7 @@ const defaultConfig = {
     minimize: true,
     minimizer: [
       new TerserJSPlugin({
-        include: /\.min\.js$/
+        include: /\.min\.(js|mjs)$/
       })
     ]
   },
@@ -72,6 +72,7 @@ const esmConfig = {
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
+    filename: '[name].mjs',
     libraryTarget: 'module'
   },
   experiments: {
@@ -80,6 +81,8 @@ const esmConfig = {
 };
 
 const configs = [config, cjsConfig, esmConfig];
+// The first compiler cleans the shared dist directory before the other compilers write.
+configs.parallelism = 1;
 
 module.exports = () => {
   configs.forEach((it) => {

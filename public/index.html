@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CupixWorks SiteView SDK - Playground</title>
     <style>
       * {
@@ -65,12 +66,6 @@
       #header-controls input.url-input {
         width: 360px;
       }
-      #header-controls input.token-input {
-        width: 180px;
-      }
-      #header-controls select.auth-type-input {
-        width: 110px;
-      }
       #btn-connect {
         padding: 4px 12px;
         background: #38bdf8;
@@ -130,14 +125,6 @@
       .section {
         padding: 10px 12px 6px;
         border-bottom: 1px solid #1a2436;
-      }
-      .section-title {
-        font-size: 10px;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 6px;
       }
       .btn-group {
         display: flex;
@@ -250,6 +237,35 @@
         color: #f87171;
       }
 
+      [hidden] { display: none !important; }
+      #header { gap: 16px; flex-wrap: wrap; }
+      #header-controls { flex: 1; }
+      #header-controls input.url-input { flex: 1; width: auto; min-width: 100px; }
+      #sidebar { width: 300px; }
+      #sidebar label { display: block; font-size: 12px; color: #cbd5e1; margin: 10px 0 5px; }
+      #sidebar input, #sidebar select {
+        width: 100%; padding: 7px 8px; border: 1px solid #475569; border-radius: 4px;
+        background: #0f172a; color: #e2e8f0; font: inherit; font-size: 12px;
+      }
+      summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 5px 0 9px; }
+      summary::marker { color: #94a3b8; }
+      .section { border-bottom-color: #334155; }
+      .hint { color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 10px 0 6px; }
+      .command-search { padding: 0 12px 10px; }
+      #btn-authenticate { margin-top: 12px; width: 100%; padding: 8px; color: #0f172a; background: #38bdf8; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      :focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+      .sub-label, .output-box .timestamp { color: #94a3b8; }
+      #cupix-container .placeholder { color: #94a3b8; }
+      @media (max-width: 700px) {
+        #header-controls { flex-basis: 100%; }
+        #main { flex-direction: column; overflow-y: auto; }
+        #content { flex: none; height: 60vh; min-height: 340px; }
+        #sidebar { width: 100%; overflow-y: visible; border-left: 0; }
+        #output { overflow-x: auto; }
+        .output-box { min-width: 180px; }
+      }
+
       /* ── Scrollbar ── */
       ::-webkit-scrollbar {
         width: 6px;
@@ -272,14 +288,8 @@
     <div id="header">
       <h1><span>SiteView</span> SDK Playground</h1>
       <div id="header-controls">
-        <label>URL</label>
-        <input id="input-url" class="url-input" type="text" value="https://apidemo.cupix.works/hsv/9hivpe82w8" />
-        <label>Token</label>
-        <select id="input-auth-type" class="auth-type-input" aria-label="Authentication type">
-          <option value="apiToken">API token</option>
-          <option value="accessCode">Access code</option>
-        </select>
-        <input id="input-token" class="token-input" type="text" placeholder="Auth value (optional)" />
+        <label for="input-url">URL</label>
+        <input id="input-url" class="url-input" type="url" value="https://apidemo.cupix.works/hsv/9hivpe82w8" />
         <button id="btn-connect" onclick="connectViewer()">Connect</button>
       </div>
     </div>
@@ -326,8 +336,37 @@
 
       <!-- Commands (right) -->
       <div id="sidebar">
-        <div class="section">
-          <div class="section-title">Document</div>
+        <details class="section" id="connection-panel" open>
+          <summary>Connection</summary>
+          <label for="input-auth-type">Authentication</label>
+          <select id="input-auth-type">
+            <option value="apiToken">API token</option>
+            <option value="accessCode">Access code</option>
+            <option value="sdkPresigned">SDK presigned</option>
+          </select>
+          <div id="token-fields">
+            <label for="input-token" id="token-label">API token</label>
+            <input id="input-token" type="password" placeholder="Optional" autocomplete="off" />
+          </div>
+          <form id="presigned-fields" hidden autocomplete="off">
+            <p class="hint">Connect first, then authenticate. The viewer keeps loading until authentication succeeds.</p>
+            <label for="input-client-id">Client ID</label>
+            <input id="input-client-id" required spellcheck="false" />
+            <label for="input-timestamp">Timestamp</label>
+            <input id="input-timestamp" required inputmode="numeric" spellcheck="false" />
+            <label for="input-signature">Signature</label>
+            <input id="input-signature" type="password" required autocomplete="off" />
+            <button id="btn-authenticate" type="submit" disabled>Authenticate</button>
+          </form>
+          <p id="connection-status" class="hint" role="status">Not connected</p>
+        </details>
+        <div class="command-search">
+          <label for="input-command-search">API commands</label>
+          <input id="input-command-search" type="search" placeholder="Find a command…" />
+          <p id="command-empty" class="hint" hidden>No matching commands</p>
+        </div>
+        <details class="section command-section" open>
+          <summary>Document</summary>
           <div class="btn-group">
             <button onclick="Playground.getDocument()" title="SiteViewSDK.getDocument">Document</button>
             <button onclick="Playground.getSiteview()" title="SiteViewSDK.getSiteview">SiteView</button>
@@ -335,9 +374,9 @@
             <button onclick="Playground.getActiveCapture()" title="SiteViewSDK.getActiveCapture">Capture</button>
             <button onclick="Playground.isDocumentLoaded()" title="SiteViewSDK.isDocumentLoaded">Loaded?</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Viewer Mode</div>
+        </details>
+        <details class="section command-section">
+          <summary>Viewer Mode</summary>
           <div class="btn-group">
             <button onclick="Playground.changeViewerMode('pano')">pano</button>
             <button onclick="Playground.changeViewerMode('bim')">bim</button>
@@ -364,9 +403,9 @@
             <button class="btn-option" onclick="Playground.setPanoRenderingMode('NORMAL')">NORMAL</button>
             <button class="btn-option" onclick="Playground.setPanoRenderingModeCubemapPrompt()">CUBEMAP...</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Camera</div>
+        </details>
+        <details class="section command-section">
+          <summary>Camera</summary>
           <div class="btn-group">
             <button onclick="Playground.getCameraParameters()" title="SiteViewSDK.getCameraParameters">Get Params</button>
             <button onclick="Playground.setCameraParametersPrompt()" title="SiteViewSDK.setCameraParameters">Set Params...</button>
@@ -402,17 +441,17 @@
             <button class="btn-option" onclick="Playground.setCameraFirstPerson(true)">enable</button>
             <button class="btn-option" onclick="Playground.setCameraFirstPerson(false)">disable</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Navigation</div>
+        </details>
+        <details class="section command-section">
+          <summary>Navigation</summary>
           <div class="btn-group">
             <button onclick="Playground.changeLevelCapturePrompt()" title="SiteViewSDK.changeLevelCapture">Level+Cap...</button>
             <button onclick="Playground.changePanoPrompt()" title="SiteViewSDK.changePano">Pano...</button>
             <button onclick="Playground.changeBimPrompt()" title="SiteViewSDK.changeBim">BIM...</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Annotation</div>
+        </details>
+        <details class="section command-section">
+          <summary>Annotation</summary>
           <div class="btn-group">
             <button onclick="Playground.setActiveAnnotationPrompt()" title="SiteViewSDK.setActiveAnnotation">Activate...</button>
             <button onclick="Playground.resetActiveAnnotation()" title="SiteViewSDK.resetActiveAnnotation">Reset</button>
@@ -443,9 +482,9 @@
             <button class="btn-option" onclick="Playground.setAnnotationGroupAllVisibility(false)" title="SiteViewSDK.setAnnotationGroupAllVisibility(false)">Hide All</button>
             <button onclick="Playground.setAnnotationGroupVisibilityPrompt()" title="SiteViewSDK.setAnnotationGroupVisibility">Group...</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Omninote</div>
+        </details>
+        <details class="section command-section">
+          <summary>Omninote</summary>
           <div class="btn-group">
             <button onclick="Playground.loadOmninotesPrompt()" title="SiteViewSDK.loadOmninotes">Load...</button>
             <button onclick="Playground.lookAtOmninotePrompt()" title="SiteViewSDK.lookAtOmninote">Look At...</button>
@@ -459,17 +498,17 @@
             <button class="btn-option" onclick="Playground.setOmninoteTagAllVisibility(false)" title="SiteViewSDK.setOmninoteTagAllVisibility(false)">Hide All</button>
             <button onclick="Playground.setOmninoteTagVisibilityPrompt()" title="SiteViewSDK.setOmninoteTagVisibility">Tags...</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Refplan</div>
+        </details>
+        <details class="section command-section">
+          <summary>Refplan</summary>
           <div class="btn-group">
             <button onclick="Playground.enableRefplan()" title="SiteViewSDK.enableRefplan">Enable</button>
             <button onclick="Playground.getRefplansOfLevelPrompt()" title="SiteViewSDK.getRefplansOfLevel">By Level...</button>
             <button onclick="Playground.setActiveRefplanPrompt()" title="SiteViewSDK.setActiveRefplan">Activate...</button>
           </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Display</div>
+        </details>
+        <details class="section command-section">
+          <summary>Display</summary>
           <div class="sub-label">Opacity</div>
           <div class="btn-group">
             <button class="btn-option" onclick="Playground.setOpacity(0.0)">0%</button>
@@ -488,7 +527,7 @@
             <button class="btn-option" onclick="Playground.setFloatMapVisible(true)">show</button>
             <button class="btn-option" onclick="Playground.setFloatMapVisible(false)">hide</button>
           </div>
-        </div>
+        </details>
       </div>
     </div>
 
