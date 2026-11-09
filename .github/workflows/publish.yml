@@ -18,10 +18,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+      integrity: ${{ steps.pack.outputs.integrity }}
 
     steps:
       - name: Verify release ref
@@ -37,7 +40,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org/
           package-manager-cache: false
 
       - name: Check release version
@@ -74,15 +76,49 @@ jobs:
           console.log(`tarball=${filename}\nintegrity=${integrity}`);
           NODE
 
-      - name: Publish to npm
-        if: ${{ !inputs.dry_run }}
+      - name: Upload validated package
+        uses: actions/upload-artifact@v6
+        with:
+          name: sdk-package
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    if: ${{ !inputs.dry_run }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Download validated package
+        uses: actions/download-artifact@v7
+        with:
+          name: sdk-package
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+
+      - name: Publish to npm via OIDC
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           RELEASE_VERSION: ${{ inputs.version }}
-          TARBALL: ${{ steps.pack.outputs.tarball }}
-          INTEGRITY: ${{ steps.pack.outputs.integrity }}
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          INTEGRITY: ${{ needs.build.outputs.integrity }}
         run: |
-          published_integrity=$(npm view "@cupix-sdk/siteview-sdk@$RELEASE_VERSION" dist.integrity || true)
+          actual_integrity="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | openssl base64 -A)"
+          if [ "$actual_integrity" != "$INTEGRITY" ]; then
+            echo 'Downloaded tarball integrity does not match the validated package.' >&2
+            exit 1
+          fi
+
+          published_integrity=$(npm view "@cupix-sdk/siteview-sdk@$RELEASE_VERSION" dist.integrity 2>/dev/null || true)
           if [ "$published_integrity" = "$INTEGRITY" ]; then
             echo 'This tarball has already been published.'
           elif [ -n "$published_integrity" ]; then
@@ -93,7 +129,6 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        if: ${{ !inputs.dry_run }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: siteview-sdk-v${{ inputs.version }}
