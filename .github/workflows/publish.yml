@@ -103,29 +103,34 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org/
           package-manager-cache: false
 
       - name: Publish to npm via OIDC
         env:
+          REGISTRY: https://registry.npmjs.org/
           RELEASE_VERSION: ${{ inputs.version }}
           TARBALL: ${{ needs.build.outputs.tarball }}
           INTEGRITY: ${{ needs.build.outputs.integrity }}
         run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo 'GitHub Actions did not grant an OIDC token request to this job.' >&2
+            exit 1
+          fi
+
           actual_integrity="sha512-$(openssl dgst -sha512 -binary "$TARBALL" | openssl base64 -A)"
           if [ "$actual_integrity" != "$INTEGRITY" ]; then
             echo 'Downloaded tarball integrity does not match the validated package.' >&2
             exit 1
           fi
 
-          published_integrity=$(npm view "@cupix-sdk/siteview-sdk@$RELEASE_VERSION" dist.integrity 2>/dev/null || true)
+          published_integrity=$(npm view "@cupix-sdk/siteview-sdk@$RELEASE_VERSION" dist.integrity --registry "$REGISTRY" 2>/dev/null || true)
           if [ "$published_integrity" = "$INTEGRITY" ]; then
             echo 'This tarball has already been published.'
           elif [ -n "$published_integrity" ]; then
             echo 'This version already exists with different contents.' >&2
             exit 1
           else
-            npm publish "./$TARBALL" --access public
+            npm publish "./$TARBALL" --access public --registry "$REGISTRY" --loglevel verbose
           fi
 
       - name: Create GitHub Release
